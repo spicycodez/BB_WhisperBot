@@ -1,0 +1,35 @@
+# Bots.Business / BJS — there is no build step.
+# The repo is consumed directly by Bots.Business's Git importer.
+# Keep these out of version control anyway:
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Secrets — NEVER commit bot tokens or API keys
+.env
+.env.local
+.env.*.local
+secrets.json
+*.token
+bot_token.txt
+
+# Local backups / exports
+*.bbbak
+export_*.json
+backup_*.zip
+
+# Logs
+*.log
+npm-debug.log*
+
+# Local scratch / testing
+scratch/
+tmp/
+.scratch/
