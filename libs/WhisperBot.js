@@ -161,8 +161,10 @@ function editOrSend(text, keyboard) {
       var editOpts = {
         chat_id: request.message.chat.id,
         message_id: request.message.message_id,
-        text: text,
-        parse_mode: null
+        text: text
+        // NOTE: parse_mode omitted — Bots.Business serializes `null` to
+        // the literal string "null" which Telegram rejects with
+        // "unsupported parse_mode". Omitting it = plain text (default).
       };
       if (keyboard) {
         editOpts.reply_markup = { inline_keyboard: keyboard };
@@ -175,7 +177,7 @@ function editOrSend(text, keyboard) {
     }
   }
 
-  var sendOpts = { text: text, parse_mode: null };
+  var sendOpts = { text: text };
   if (keyboard) {
     sendOpts.reply_markup = { inline_keyboard: keyboard };
   }

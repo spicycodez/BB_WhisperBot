@@ -40,8 +40,7 @@ if (!query || !query.trim()) {
         "@wisspbot " + SC.toSmallCaps("@username your secret message") + "\n" +
         "@wisspbot " + SC.toSmallCaps("123456789 your secret message") + "\n" +
         SC.scDivider() + "\n" +
-        SC.toSmallCaps("Only the target can reveal the message — it pops up privately."),
-      parse_mode: null
+        SC.toSmallCaps("Only the target can reveal the message — it pops up privately.")
     },
     reply_markup: {
       inline_keyboard: [[
@@ -64,8 +63,7 @@ if (!query || !query.trim()) {
         SC.scDivider() + "\n" +
         SC.toSmallCaps("Syntax:") + "\n" +
         "@wisspbot " + SC.toSmallCaps("@username your message") + "\n" +
-        "@wisspbot " + SC.toSmallCaps("123456789 your message"),
-      parse_mode: null
+        "@wisspbot " + SC.toSmallCaps("123456789 your message")
     }
   });
 } else {
@@ -96,8 +94,7 @@ if (!query || !query.trim()) {
     title: SC.toSmallCaps("Whisper for") + " " + SC.toSmallCaps(label),
     description: preview,
     input_message_content: {
-      message_text: card,
-      parse_mode: null
+      message_text: card
     },
     reply_markup: {
       inline_keyboard: [[

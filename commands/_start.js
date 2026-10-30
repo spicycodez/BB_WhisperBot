@@ -66,8 +66,9 @@ if (SC.START_PHOTO_URL) {
     Api.sendPhoto({
       photo: SC.START_PHOTO_URL,
       caption: caption,
-      parse_mode: null,
       reply_markup: keyboard
+      // parse_mode omitted — BB serializes `null` to the string "null",
+      // which Telegram rejects. Plain text is the default.
     });
     return;
   } catch (e) { /* fall through to text menu */ }
@@ -75,6 +76,5 @@ if (SC.START_PHOTO_URL) {
 
 Api.sendMessage({
   text: caption,
-  parse_mode: null,
   reply_markup: keyboard
 });

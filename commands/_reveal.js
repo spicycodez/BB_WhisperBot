@@ -23,7 +23,7 @@ function showStub() {
     "@wisspbot " + SC.toSmallCaps("123456789 your secret message") + "\n" +
     SC.scDivider() + "\n" +
     SC.toSmallCaps("Only the target can tap reveal.");
-  Api.sendMessage({ text: text, parse_mode: null });
+  Api.sendMessage({ text: text });
 }
 
 // ---------- Callback reveal ----------

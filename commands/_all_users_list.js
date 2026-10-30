@@ -70,16 +70,17 @@ keyboard.push([
 
 SC.editOrSend(body, keyboard);
 
-// On page 1, also send a complete JSON export as a separate message.
+// On page 1, also send a complete JSON export as a separate plain-text
+// message. (Using plain text instead of Markdown code blocks because
+// user-supplied data — names, usernames — could contain Markdown special
+// chars like `_`, `*`, `[`, `]`, `backtick` that would break formatting.)
 if (page === 1) {
   var all = W.exportAllUsers();
   var json = JSON.stringify(all, null, 2);
-  // Telegram messages cap at 4096 chars; chunk if needed.
   var chunks = chunkString(json, 3500);
   for (var c = 0; c < chunks.length; c++) {
     Api.sendMessage({
-      text: "```json\n" + chunks[c] + "\n```",
-      parse_mode: "Markdown"
+      text: chunks[c]
     });
   }
 }

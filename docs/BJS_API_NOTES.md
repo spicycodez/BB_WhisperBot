@@ -160,7 +160,6 @@ For full control (and what we use in this project for the `/start` menu):
 Api.sendMessage({
   chat_id: chat.chatid,                  // optional; defaults to current chat
   text: "Welcome!",
-  parse_mode: null,                       // null = plain text, "Markdown" or "HTML"
   reply_markup: {
     inline_keyboard: [
       [
@@ -171,6 +170,31 @@ Api.sendMessage({
   }
 });
 ```
+
+### ⚠️ parse_mode caveat (IMPORTANT)
+
+Do **NOT** pass `parse_mode: null`. Bots.Business serializes the JS `null` to the literal string `"null"` when sending to Telegram, and Telegram rejects it with:
+
+```
+Bad Request: unsupported parse_mode            (for sendMessage / sendPhoto)
+Bad Request: Field "parse_mode" must be of type String   (for answerInlineQuery results)
+```
+
+Instead, **omit the `parse_mode` key entirely** from the options object — Bots.Business defaults to plain text:
+
+```js
+// ❌ DON'T do this:
+Api.sendMessage({ text: msg, parse_mode: null });
+
+// ✅ DO this:
+Api.sendMessage({ text: msg });
+```
+
+If you genuinely need formatting, pass a real string: `parse_mode: "Markdown"` or `parse_mode: "HTML"`. Be aware that small-caps text contains underscores (e.g. `@UserName_02`) which Markdown would interpret as italic, so for this bot we use plain text everywhere except where unavoidable.
+
+For `Api.answerInlineQuery` results, the same rule applies to `input_message_content` — omit `parse_mode` for plain text.
+
+For `Api.answerCallbackQuery` and `Api.editMessageText`, the same rule applies.
 
 For `answerInlineQuery` and `answerCallbackQuery` you MUST use `Api.*` — there is no `Bot.*` shortcut.
 

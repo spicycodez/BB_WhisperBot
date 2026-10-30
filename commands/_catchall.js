@@ -22,7 +22,6 @@ if (typeof text === "string" && text.charAt(0) === "/") {
 
   Api.sendMessage({
     text: body,
-    parse_mode: null,
     reply_markup: {
       inline_keyboard: [
         [
@@ -42,7 +41,6 @@ if (typeof text === "string" && text.charAt(0) === "/") {
 // Otherwise it is an ordinary message, photo, file, sticker, etc.
 Api.sendMessage({
   text: SC.toSmallCaps("Send /start to open menu"),
-  parse_mode: null,
   reply_markup: {
     inline_keyboard: [[
       { text: SC.toSmallCaps("Open menu"), callback_data: "/start" }

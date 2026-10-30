@@ -42,14 +42,14 @@ SC.editOrSend(body, [[
   { text: SC.toSmallCaps("Home"),           callback_data: "/start" }
 ]]);
 
-// Send the full JSON dump as a separate code-block message.
+// Send the full JSON dump as plain-text messages. (Plain text, not
+// Markdown code blocks, because user data may contain `_`, `*`, etc.)
 var all = W.exportAllUsers();
 var json = JSON.stringify(all, null, 2);
 var chunks = chunkString(json, 3500);
 for (var c = 0; c < chunks.length; c++) {
   Api.sendMessage({
-    text: "```json\n" + chunks[c] + "\n```",
-    parse_mode: "Markdown"
+    text: chunks[c]
   });
 }
 
