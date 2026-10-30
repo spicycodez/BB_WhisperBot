@@ -29,7 +29,7 @@ var BOT_USERNAME = "wisspbot";
 
 // Banner photo URL for the /start menu. Replace with your own banner
 // image (or set to "" to send a text-only menu instead of a photo).
-var START_PHOTO_URL = "";
+var START_PHOTO_URL = "https://yukiapi.site/file/q1J9hr3d";
 
 /* ============================================================
  *  SMALL CAPS STYLING
