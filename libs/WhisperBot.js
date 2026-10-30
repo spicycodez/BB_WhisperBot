@@ -31,6 +31,12 @@ var BOT_USERNAME = "wisspbot";
 // image (or set to "" to send a text-only menu instead of a photo).
 var START_PHOTO_URL = "https://yukiapi.site/file/q1J9hr3d";
 
+// Small square icon URL used as the `thumb_url` on every inline result
+// card (the small picture shown next to each result in Telegram's inline
+// dropdown — replaces the default "W" letter avatar).
+// If left empty, the inline results fall back to START_PHOTO_URL.
+var BOT_ICON_URL = "";
+
 /* ============================================================
  *  SMALL CAPS STYLING
  * ============================================================ */
@@ -152,19 +158,29 @@ function isLoggingEnabled() {
  * ============================================================ */
 
 function editOrSend(text, keyboard) {
-  var hasMsg = (request && request.message &&
-                request.message.message_id &&
-                request.message.chat);
+  // We only try to edit-in-place when ALL of these are true:
+  //   1. We are in a callback context (request.data is set) — meaning the
+  //      user tapped a button on a BOT message, so the bot is allowed to
+  //      edit that message. If request.data is absent, the command was
+  //      typed directly and request.message is the USER's message, which
+  //      the bot cannot edit.
+  //   2. The source message is NOT a photo. editMessageText only works on
+  //      text messages; for photo captions you would need editMessageCaption
+  //      and even then you cannot replace the photo with text. So for photo
+  //      menus (like /start), we always send a new message — the photo stays
+  //      as a "home base" and new content appears below it.
+  //   3. The message has chat + message_id.
+  var msg = request && request.message;
+  var isCallback = !!(request && request.data);
+  var isPhoto    = !!(msg && msg.photo && msg.photo.length);
+  var hasMsg     = !!(msg && msg.message_id && msg.chat);
 
-  if (hasMsg) {
+  if (isCallback && hasMsg && !isPhoto) {
     try {
       var editOpts = {
-        chat_id: request.message.chat.id,
-        message_id: request.message.message_id,
+        chat_id: msg.chat.id,
+        message_id: msg.message_id,
         text: text
-        // NOTE: parse_mode omitted — Bots.Business serializes `null` to
-        // the literal string "null" which Telegram rejects with
-        // "unsupported parse_mode". Omitting it = plain text (default).
       };
       if (keyboard) {
         editOpts.reply_markup = { inline_keyboard: keyboard };
@@ -172,11 +188,15 @@ function editOrSend(text, keyboard) {
       Api.editMessageText(editOpts);
       return;
     } catch (e) {
-      // editMessageText can fail if the message is too old or the text
-      // is identical — fall through to a fresh send.
+      // editMessageText can fail if the message is too old or the text is
+      // identical — fall through to a fresh sendMessage.
     }
   }
 
+  // Default: send as a new message. This branch handles:
+  //   - Direct commands (typed, not from a button)
+  //   - Callbacks on photo messages (can't edit photo → send new message)
+  //   - Any edit failure
   var sendOpts = { text: text };
   if (keyboard) {
     sendOpts.reply_markup = { inline_keyboard: keyboard };
@@ -232,6 +252,7 @@ publish({
   LOGGER_CHAT_ID: LOGGER_CHAT_ID,
   BOT_USERNAME: BOT_USERNAME,
   START_PHOTO_URL: START_PHOTO_URL,
+  BOT_ICON_URL: BOT_ICON_URL,
   // text
   toSmallCaps: toSmallCaps,
   scDivider: scDivider,

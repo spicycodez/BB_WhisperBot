@@ -8,13 +8,19 @@ CMD*/
 // "@wisspbot <query>" in any chat.
 //
 // Behavior:
-//   • Empty query      → how-to card with a button to open the bot privately
-//   • Invalid query    → error card explaining the right format
+//   • Empty query      → how-to card. The DESCRIPTION shows the format
+//                        directly (no need to tap "see syntax"), with
+//                        a button to open the bot privately.
+//   • Invalid query    → error card. The DESCRIPTION shows the actual
+//                        error so the user sees it immediately in the
+//                        inline dropdown.
 //   • Valid query      → store whisper, return a card that names the
-//                        recipient and carries the "👁 ʀᴇᴠᴇᴀʟ ᴡʜɪsᴘᴇʀ" button.
-//                        The preview (description) shows ~30 chars of the
-//                        message in Telegram's inline result list ONLY;
-//                        the posted card never contains the message text.
+//                        recipient and carries the "👁 ʀᴇᴠᴇᴀʟ ᴡʜɪsᴘᴇʀ"
+//                        button. The description shows ~30 chars of the
+//                        message so the sender can confirm before sending.
+//
+// Every result carries `thumb_url` set to the bot's icon image, which
+// replaces the default "W" letter avatar in Telegram's inline dropdown.
 
 if (!request || !request.id) { return; }
 
@@ -24,15 +30,27 @@ var W  = Libs.WhisperStore;
 var query = request.query || "";
 var parsed = W.parseQuery(query, SC);
 
+// Resolve the bot icon URL: prefer BOT_ICON_URL, fall back to START_PHOTO_URL.
+var iconUrl = SC.BOT_ICON_URL || SC.START_PHOTO_URL || "";
+
+// Helper: build an InlineQueryResultArticle with the bot icon attached.
+function makeResult(props) {
+  if (iconUrl) {
+    props.thumb_url = iconUrl;
+  }
+  return props;
+}
+
 var results = [];
 
 if (!query || !query.trim()) {
-  // Empty query → how-to card
-  results.push({
+  // Empty query → how-to card. Description shows the format directly
+  // (visible in the dropdown without tapping).
+  results.push(makeResult({
     type: "article",
     id: "how-to",
     title: SC.toSmallCaps("Whisper Bot — how to use"),
-    description: SC.toSmallCaps("Tap to see the syntax"),
+    description: SC.toSmallCaps("Format: @wisspbot @username message"),
     input_message_content: {
       message_text:
         SC.toSmallCaps("How to whisper") + "\n" +
@@ -47,14 +65,16 @@ if (!query || !query.trim()) {
         { text: SC.toSmallCaps("Open bot privately"), url: "https://t.me/" + SC.BOT_USERNAME }
       ]]
     }
-  });
+  }));
 } else if (!parsed.ok) {
-  // Invalid query → error card
-  results.push({
+  // Invalid query → error card. Description shows the actual error
+  // (truncated to fit Telegram's description field) so the user sees
+  // the problem immediately without tapping.
+  results.push(makeResult({
     type: "article",
     id: "error-" + Math.floor(Math.random() * 1e9).toString(36),
-    title: SC.toSmallCaps("Invalid whisper — tap for help"),
-    description: SC.toSmallCaps("Wrong target or message"),
+    title: SC.toSmallCaps("Invalid whisper — see format"),
+    description: SC.truncate(parsed.error, 100),
     input_message_content: {
       message_text:
         SC.toSmallCaps("Could not send whisper") + "\n" +
@@ -65,7 +85,7 @@ if (!query || !query.trim()) {
         "@wisspbot " + SC.toSmallCaps("@username your message") + "\n" +
         "@wisspbot " + SC.toSmallCaps("123456789 your message")
     }
-  });
+  }));
 } else {
   // Valid → store whisper, return card
   var id = W.storeWhisper(parsed, user);
@@ -88,7 +108,7 @@ if (!query || !query.trim()) {
   var preview = SC.toSmallCaps("Message:") + " " +
                 SC.truncate(parsed.message, 30);
 
-  results.push({
+  results.push(makeResult({
     type: "article",
     id: id,
     title: SC.toSmallCaps("Whisper for") + " " + SC.toSmallCaps(label),
@@ -101,7 +121,7 @@ if (!query || !query.trim()) {
         { text: "👁 " + SC.toSmallCaps("Reveal whisper"), callback_data: "/reveal " + id }
       ]]
     }
-  });
+  }));
 }
 
 Api.answerInlineQuery({
