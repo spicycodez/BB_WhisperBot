@@ -21,7 +21,9 @@ var page = 1;
 var p = (params || "").trim();
 if (p && /^[0-9]+$/.test(p)) { page = parseInt(p, 10); }
 
-var info = W.listUsersPage(page, 15);
+// 10 users per page — fits comfortably within Telegram's 1024-char
+// caption limit so editOrSend can edit the photo menu in place.
+var info = W.listUsersPage(page, 10);
 var users = info.users;
 var totalPages = info.totalPages;
 page = info.page;
@@ -41,7 +43,7 @@ if (!users.length) {
     var uname = u.username ? "@" + u.username : "—";
     var name = u.name ? u.name : "—";
     var join = formatDate(u.join_date);
-    body += (i + 1 + (page - 1) * 15) + ". " + SC.toSmallCaps("id") + ": " + u.telegramid + "\n" +
+    body += (i + 1 + (page - 1) * 10) + ". " + SC.toSmallCaps("id") + ": " + u.telegramid + "\n" +
             "   " + SC.toSmallCaps("name") + ": " + name + "\n" +
             "   " + SC.toSmallCaps("username") + ": " + uname + "\n" +
             "   " + SC.toSmallCaps("joined") + ": " + join + "\n" +
@@ -70,20 +72,10 @@ keyboard.push([
 
 SC.editOrSend(body, keyboard);
 
-// On page 1, also send a complete JSON export as a separate plain-text
-// message. (Using plain text instead of Markdown code blocks because
-// user-supplied data — names, usernames — could contain Markdown special
-// chars like `_`, `*`, `[`, `]`, `backtick` that would break formatting.)
-if (page === 1) {
-  var all = W.exportAllUsers();
-  var json = JSON.stringify(all, null, 2);
-  var chunks = chunkString(json, 3500);
-  for (var c = 0; c < chunks.length; c++) {
-    Api.sendMessage({
-      text: chunks[c]
-    });
-  }
-}
+// NOTE: The automatic JSON export on page 1 was removed for the
+// "zero spam" redesign — all menus now live in one self-updating
+// message. The owner can still get the full JSON via /export_users,
+// which is an explicit data-export command (not a menu navigation).
 
 function formatDate(ms) {
   if (!ms) { return "—"; }

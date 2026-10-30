@@ -8,6 +8,17 @@ Every line of text the bot sends is rendered in **small caps** (Unicode small ca
 
 ## ✨ Features
 
+### Zero-spam menu navigation
+
+All menus live in **one self-updating message**. When you tap a button (Help, My id, Create whisper, etc.), the current message is edited in place — no new message is sent:
+
+- Photo menu (`/start` direct command) → sends one photo message
+- Subsequent navigation → `editMessageCaption` updates the caption + keyboard in place (photo stays as a permanent header)
+- Text-menu navigation → `editMessageText` updates text + keyboard in place
+- Direct typed commands (e.g. `/help`) → still send a new message, since there's no prior bot message to edit
+
+This keeps the chat clean — no message spam from menu navigation.
+
 ### Whisper mechanism
 
 | Feature | How it works |
@@ -28,7 +39,6 @@ Every line of text the bot sends is rendered in **small caps** (Unicode small ca
 |---|---|---|
 | `whisper_<id>` | — | One whisper object: id, target, message, sender, date, view_count |
 | `user_<tid>` | — | One user object: telegramid, name, username, join_date, whisper_count, inline_count |
-| `user_whispers_<tid>` | 100 newest | Per-user whisper history |
 | `global_whispers` | 2000 newest | Global whisper index |
 | `users_index` | — | All registered telegramids (registration order) |
 
@@ -36,10 +46,9 @@ Every line of text the bot sends is rendered in **small caps** (Unicode small ca
 
 | Command | What it does |
 |---|---|
-| `/start` | Photo menu with usage examples, 5 buttons (create / try in group / my whispers / help / share bot), registers user, notifies owner on first start |
+| `/start` | Photo menu with usage examples, 4 buttons (create / try in group / help / my id / share bot), registers user, notifies owner on first start. All menus edit-in-place (zero spam) |
 | `/create_whisper` (alias `/whisper`) | Instructions + button to open inline mode in the current chat |
-| `/mywhispers` | User's 10 newest whispers with id, recipient, date, preview, and a per-whisper View button |
-| `/mywhisper_view <id>` | Full whisper detail — only the creator (or owner) can open it |
+| `/create_whisper` (alias `/whisper`) | Instructions + button to open inline mode in the current chat |
 | `/help` | What a whisper is, exact inline syntax, how revealing works, 3 practical tips |
 | `/cancel` | Clears any half-finished draft (leftover — whispers are inline only, nothing to clear) |
 | `/reveal`, `/whisper_target`, `/whisper_text` | Informational stubs that redirect to inline mode (`/reveal` is also the callback target for the 👁 button) |
@@ -62,7 +71,7 @@ Anyone else gets `⛔ ᴀᴄᴄᴇss ᴅᴇɴɪᴇᴅ`.
 ### Shared helpers (in `libs/`)
 
 - **`libs/WhisperBot.js`** — `OWNER_ID`, `SUDO_USERS`, `LOGGER_CHAT_ID`, `BOT_USERNAME`, `START_PHOTO_URL` constants. Exports `toSmallCaps`, `scDivider`, `escapeHtml`, `truncate`, `isOwner`, `isSudo`, `isOwnerOrSudo`, `isLoggingEnabled`, `editOrSend` (smart edit helper), `logReveal`, `ackCallback`.
-- **`libs/WhisperStore.js`** — `parseQuery`, `generateId`, `registerUser`, `getUser`, `storeWhisper`, `getWhisper`, `deleteWhisper`, `incrementViewCount`, `listUserWhispers`, `listGlobalWhispers`, `bumpCounter`, `getCounter`, `getTodayCount`, `todayStr`, `topWhisperSenders`, `topInlineSenders`, `totalUsers`, `listUsersPage`, `exportAllUsers`.
+- **`libs/WhisperStore.js`** — `parseQuery`, `generateId`, `registerUser`, `getUser`, `storeWhisper`, `getWhisper`, `deleteWhisper`, `incrementViewCount`, `listGlobalWhispers`, `bumpCounter`, `getCounter`, `getTodayCount`, `todayStr`, `topWhisperSenders`, `topInlineSenders`, `totalUsers`, `listUsersPage`, `exportAllUsers`.
 
 Every command calls `Libs.WhisperBot.toSmallCaps(...)` on every string it sends, so the bot's voice is consistent end-to-end.
 
@@ -132,8 +141,6 @@ whisper-bot-bjs/
 ├── commands/
 │   ├── _start.js                     # /start        — photo menu, registers user
 │   ├── _create_whisper.js            # /create_whisper + /whisper alias
-│   ├── _mywhispers.js                # /mywhispers   — 10 newest, View buttons
-│   ├── _mywhisper_view.js            # /mywhisper_view <id>
 │   ├── _help.js                      # /help         — syntax + 3 tips
 │   ├── _id.js                        # /id           — your Telegram id
 │   ├── _cancel.js                    # /cancel       — leftover, harmless
@@ -207,7 +214,7 @@ Set `START_PHOTO_URL = "https://your.cdn/banner.jpg"` in `libs/WhisperBot.js`. T
 - **Recipient verification is server-side.** The BJS `user` object is populated by Bots.Business from Telegram's signed callback payload — it cannot be faked by editing `callback_data`.
 - **`callback_data` is input, not authorization.** Anyone can press any button; `/reveal` re-checks target/sender/owner/sudo on every tap.
 - **Owner-only commands** are guarded by `Libs.WhisperBot.isOwnerOrSudo(user)` at the top of every admin command.
-- **Popup truncation at ~195 chars** is a Telegram limit, not a bug. Long whispers get cut off with `…`; the full text is still accessible via `/mywhisper_view <id>` for the sender/owner.
+- **Popup truncation at ~195 chars** is a Telegram limit, not a bug. Long whispers get cut off with `…`.
 
 ---
 

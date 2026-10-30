@@ -26,10 +26,10 @@ if (typeof text === "string" && text.charAt(0) === "/") {
       inline_keyboard: [
         [
           { text: SC.toSmallCaps("Create whisper"), callback_data: "/create_whisper" },
-          { text: SC.toSmallCaps("My whispers"),    callback_data: "/mywhispers" }
+          { text: SC.toSmallCaps("Help"),           callback_data: "/help" }
         ],
         [
-          { text: SC.toSmallCaps("Help"),           callback_data: "/help" },
+          { text: SC.toSmallCaps("My id"),          callback_data: "/id" },
           { text: SC.toSmallCaps("Home"),           callback_data: "/start" }
         ]
       ]

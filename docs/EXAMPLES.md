@@ -43,7 +43,7 @@ So `@12345` (starts with digit), `@_john` (starts with underscore), `@john_` (en
 ```
 @wisspbot @john <800-character message...>
 ```
-- Stored in full (visible to sender via `/mywhisper_view`)
+- Stored in full (only the bot owner can audit whispers via `/reveal` owner override)
 - Popup reveals truncate to ~195 chars with `…` (Telegram alert limit)
 
 ### Send whisper in a group
@@ -61,14 +61,6 @@ So `@12345` (starts with digit), `@_john` (starts with underscore), `@john_` (en
 3. Tap → send → tap Reveal → popup with your note
 4. Or use your numeric id: `@wisspbot 1234567890 remember to buy milk`
 
-### View your own whispers
-
-1. Send `/start` to `@wisspbot` privately
-2. Tap **My whispers**
-3. See your 10 newest whispers with id, recipient, date, 30-char preview
-4. Tap any **View** button → full whisper detail
-
----
 
 ## ⚠️ Edge cases & validation
 
@@ -117,14 +109,14 @@ If none match → "ɴᴏᴛ ғᴏʀ ʏᴏᴜ! ᴏɴʟʏ @ᴛᴀʀɢᴇᴛ ᴄᴀ
 ### Whisper never tapped
 
 - Stays in storage indefinitely (no expiry in this version)
-- Visible to the sender via `/mywhisper_view <id>` forever
+- (The /mywhispers feature was removed; the bot owner can still reveal any whisper via the owner-override in /reveal)
 - Counts as 1 in `whisper_count_total` but 0 in `whisper_count_revealed`
 
 ### Long message truncation
 
 - Stored: full message (up to 800 chars)
 - Popup reveal: truncated to ~195 chars with `…` (Telegram alert limit)
-- `/mywhisper_view`: full message visible to sender/owner
+- (Removed: /mywhispers and /mywhisper_view)
 
 There is no automatic "deliver the rest via DM" fallback in this version. If you need it, modify `/reveal` to call `Bot.sendMessageToChatWithId(user.telegramid, fullMessage)` when the message is > 195 chars.
 
@@ -169,11 +161,10 @@ After deploying, verify all of these:
 - [ ] `@wisspbot @john` (no message) → error card
 
 ### Private chat
-- [ ] `/start` → photo menu (or text menu if no photo URL) + 5 buttons
+- [ ] `/start` → photo menu (or text menu if no photo URL) + 4 buttons (Create / Try / Help / My id / Share)
 - [ ] `/start` from a brand new user → owner gets a "ɴᴇᴡ ᴜsᴇʀ ᴀʀʀɪᴠᴇᴅ" DM
 - [ ] **Create whisper** button → /create_whisper page
 - [ ] **Try in group** button → puts `@wisspbot ` in the input field
-- [ ] **My whispers** → list of 10 newest (or "no whispers yet")
 - [ ] **Help** → /help with 3 tips
 - [ ] **Share bot** → Telegram share chat picker
 - [ ] `/id` → your Telegram ID and @username

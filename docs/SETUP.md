@@ -126,15 +126,24 @@ You should see the commands listed under **Commands** and both libraries under *
 ### Private chat menu
 
 1. Open a private chat with `@wisspbot`
-2. Send `/start` → photo menu with usage examples + 5 buttons (Create whisper / Try in group / My whispers / Help / Share bot)
+2. Send `/start` → photo menu with usage examples + 4 buttons (Create whisper / Try in group / Help / My id / Share bot)
 3. Tap **Try in group** → puts `@wisspbot ` into the current chat's input field
 4. Tap **Share bot** → Telegram asks you to pick a chat to share the bot in
-5. Tap **My whispers** → your 10 newest whispers, each with a View button
 6. Tap any View button → full whisper detail
 7. Send `/help` → detailed help with the 3 tips
 8. Send `/id` → your Telegram id + @username
 9. Send any random text → "sᴇɴᴅ /start ᴛᴏ ᴏᴘᴇɴ ᴍᴇɴᴜ"
 10. Send `/nonexistent` → "ᴜɴᴋɴᴏᴡɴ ᴄᴏᴍᴍᴀɴᴅ" with menu buttons
+
+### Zero-spam menu navigation
+
+1. Send `/start` → photo menu appears
+2. Tap **Help** → the SAME photo message's caption updates to show help text (no new message sent)
+3. Tap **Home** → caption updates back to start text (still the same message)
+4. Tap **My id** → caption updates to show your Telegram id
+5. Tap **Home** → back to start
+
+All navigation happens in one self-updating message — the chat stays clean.
 
 ### Owner dashboard
 

@@ -6,7 +6,6 @@
  *
  *   whisper_<id>            json    one whisper object
  *   user_<telegramid>       json    one user object (with counters)
- *   user_whispers_<tid>     json    array of whisper ids (newest first)
  *   global_whispers         json    array of whisper ids (newest first, cap 2000)
  *   users_index             json    array of telegramids (registration order)
  *   whisper_count_total     integer total whispers ever sent
@@ -219,14 +218,10 @@ function storeWhisper(parsed, sender) {
   };
   Bot.setProperty("whisper_" + id, whisper, "json");
 
-  // Add to sender's personal list (newest first, capped)
+  // Bump the sender's per-user counters (used by /stats and /top_whispers).
+  // The per-user whisper LIST (user_whispers_<tid>) was removed along
+  // with the /mywhispers feature — we only keep the count now.
   if (whisper.sender_id) {
-    var myListKey = "user_whispers_" + whisper.sender_id;
-    var myList = Bot.getProperty(myListKey);
-    if (!myList) { myList = []; }
-    myList.unshift(id);
-    if (myList.length > USER_LIST_CAP) { myList = myList.slice(0, USER_LIST_CAP); }
-    Bot.setProperty(myListKey, myList, "json");
     bumpUserCounters(whisper.sender_id, "whisper");
     bumpUserCounters(whisper.sender_id, "inline");
   }
@@ -273,21 +268,6 @@ function incrementViewCount(id) {
 /* ============================================================
  *  LIST QUERIES
  * ============================================================ */
-
-// Up to `limit` of a user's own whispers (newest first).
-// Returns array of whisper objects (skips missing ids).
-function listUserWhispers(tid, limit) {
-  if (!tid) { return []; }
-  if (!limit) { limit = 10; }
-  var ids = Bot.getProperty("user_whispers_" + String(tid));
-  if (!ids) { return []; }
-  var out = [];
-  for (var i = 0; i < ids.length && out.length < limit; i++) {
-    var w = Bot.getProperty("whisper_" + ids[i]);
-    if (w) { out.push(w); }
-  }
-  return out;
-}
 
 // Up to `limit` global whispers (newest first).
 function listGlobalWhispers(limit) {
@@ -445,7 +425,6 @@ publish({
   getWhisper: getWhisper,
   deleteWhisper: deleteWhisper,
   incrementViewCount: incrementViewCount,
-  listUserWhispers: listUserWhispers,
   listGlobalWhispers: listGlobalWhispers,
   // counters
   bumpCounter: bumpCounter,

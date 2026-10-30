@@ -158,44 +158,58 @@ function isLoggingEnabled() {
  * ============================================================ */
 
 function editOrSend(text, keyboard) {
-  // We only try to edit-in-place when ALL of these are true:
-  //   1. We are in a callback context (request.data is set) — meaning the
-  //      user tapped a button on a BOT message, so the bot is allowed to
-  //      edit that message. If request.data is absent, the command was
-  //      typed directly and request.message is the USER's message, which
-  //      the bot cannot edit.
-  //   2. The source message is NOT a photo. editMessageText only works on
-  //      text messages; for photo captions you would need editMessageCaption
-  //      and even then you cannot replace the photo with text. So for photo
-  //      menus (like /start), we always send a new message — the photo stays
-  //      as a "home base" and new content appears below it.
-  //   3. The message has chat + message_id.
+  // ZERO-SPAM MENU NAVIGATION
+  //
+  // When a button is tapped on a BOT message, we edit that message in
+  // place instead of sending a new one. This keeps all menus in ONE
+  // self-updating message:
+  //
+  //   • Photo source  → Api.editMessageCaption  (photo stays as a
+  //                    permanent header; caption + keyboard update)
+  //   • Text source   → Api.editMessageText     (text + keyboard update)
+  //
+  // We only attempt the edit when ALL of these are true:
+  //   1. request.data is set (callback context — the message is the
+  //      bot's, so it's editable). If absent, the command was typed
+  //      directly and request.message is the USER's message, which the
+  //      bot cannot edit.
+  //   2. request.message has message_id + chat.
+  //
+  // Telegram caption limit is 1024 chars; if the text is longer we
+  // truncate with "…" so the edit doesn't fail.
   var msg = request && request.message;
   var isCallback = !!(request && request.data);
   var isPhoto    = !!(msg && msg.photo && msg.photo.length);
   var hasMsg     = !!(msg && msg.message_id && msg.chat);
 
-  if (isCallback && hasMsg && !isPhoto) {
+  if (isCallback && hasMsg) {
     try {
-      var editOpts = {
+      var opts = {
         chat_id: msg.chat.id,
-        message_id: msg.message_id,
-        text: text
+        message_id: msg.message_id
       };
       if (keyboard) {
-        editOpts.reply_markup = { inline_keyboard: keyboard };
+        opts.reply_markup = { inline_keyboard: keyboard };
       }
-      Api.editMessageText(editOpts);
+      if (isPhoto) {
+        // Photo message — edit the caption (photo stays as header).
+        // Truncate to 1020 chars to stay under Telegram's 1024 caption limit.
+        opts.caption = truncate(text, 1020);
+        Api.editMessageCaption(opts);
+      } else {
+        // Text message — edit the text (4096 char limit, plenty of room).
+        opts.text = text;
+        Api.editMessageText(opts);
+      }
       return;
     } catch (e) {
-      // editMessageText can fail if the message is too old or the text is
-      // identical — fall through to a fresh sendMessage.
+      // Edit can fail if the message is too old, the text is identical,
+      // or the message isn't editable. Fall through to a fresh send.
     }
   }
 
-  // Default: send as a new message. This branch handles:
+  // Default: send as a new text message. This branch handles:
   //   - Direct commands (typed, not from a button)
-  //   - Callbacks on photo messages (can't edit photo → send new message)
   //   - Any edit failure
   var sendOpts = { text: text };
   if (keyboard) {
