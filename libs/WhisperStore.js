@@ -46,9 +46,17 @@ var USERNAME_RE = /^[A-Za-z](?:[A-Za-z0-9]|_(?!_)){3,30}[A-Za-z0-9]$/;
  * ============================================================ */
 
 // Parse an inline query.
-// Returns { ok:true, target_type, target_value, message } on success
-// or { ok:false, error } on failure. `error` is already small-caps
-// styled and safe to display.
+// Returns { ok:true, target_type, target_value, target_display, message }
+// on success or { ok:false, error, [target_type, target_value,
+// target_display] } on failure. `error` is already small-caps styled and
+// safe to display.
+//
+// target_display = the target EXACTLY as the sender typed it
+// (e.g. "@Maxim" — original case preserved), used for showing the name
+// on cards/popups. target_value stays lowercase for case-insensitive
+// matching. On a missing-message error the target fields are still
+// returned when the target itself is valid, so the inline command can
+// render a live "composing" preview card.
 function parseQuery(query, sc) {
   if (!query) {
     return { ok: false, error: sc.toSmallCaps("Empty query. Use @username message or 123456789 message.") };
@@ -64,14 +72,11 @@ function parseQuery(query, sc) {
     var c = raw.charCodeAt(i);
     if (c === 32 || c === 9 || c === 10 || c === 13) { spaceIdx = i; break; }
   }
-  if (spaceIdx === -1) {
-    return { ok: false, error: sc.toSmallCaps("Missing message body. Use @username your message.") };
-  }
+  var token = spaceIdx === -1 ? raw : raw.slice(0, spaceIdx);
+  var message = spaceIdx === -1 ? "" : raw.slice(spaceIdx + 1).trim();
 
-  var token = raw.slice(0, spaceIdx);
-  var message = raw.slice(spaceIdx + 1).trim();
   if (!message) {
-    return { ok: false, error: sc.toSmallCaps("Missing message body. Use @username your message.") };
+    return missingBody(sc, token);
   }
   if (message.length > MAX_MESSAGE_LEN) {
     return { ok: false, error: sc.toSmallCaps("Message too long. Maximum " + MAX_MESSAGE_LEN + " characters.") };
@@ -79,7 +84,6 @@ function parseQuery(query, sc) {
 
   var target_type = null;
   var target_value = null;
-  var original_value = null;
 
   if (token.charAt(0) === "@") {
     var username = token.slice(1);
@@ -99,15 +103,11 @@ function parseQuery(query, sc) {
     // Lowercase for case-insensitive matching on reveal — so a whisper
     // sent to @USERNAME, @username or @UserName all match the same user.
     target_value = username.toLowerCase();
-    // Preserve the original case as the sender typed it, for display on
-    // the whisper card (e.g. sender types @Maxim → card shows @Maxim).
-    original_value = username;
   } else if (/^[0-9]+$/.test(token) &&
              token.length >= ID_DIGITS_MIN &&
              token.length <= ID_DIGITS_MAX) {
     target_type = "id";
     target_value = token;
-    original_value = token;
   } else {
     return {
       ok: false,
@@ -122,9 +122,36 @@ function parseQuery(query, sc) {
     ok: true,
     target_type: target_type,
     target_value: target_value,
-    original_value: original_value || target_value,
+    target_display: token,
     message: message
   };
+}
+
+// "Target typed but no message yet" — build the error result, and when
+// the target itself is VALID attach its fields so the inline command can
+// show a live composing preview ("@Maxim" with original case kept).
+function missingBody(sc, token) {
+  var res = {
+    ok: false,
+    error: sc.toSmallCaps("Missing message body. Use @username your message.")
+  };
+  if (token) {
+    if (token.charAt(0) === "@") {
+      var uname = token.slice(1);
+      if (USERNAME_RE.test(uname)) {
+        res.target_type = "username";
+        res.target_value = uname.toLowerCase();
+        res.target_display = token;
+      }
+    } else if (/^[0-9]+$/.test(token) &&
+               token.length >= ID_DIGITS_MIN &&
+               token.length <= ID_DIGITS_MAX) {
+      res.target_type = "id";
+      res.target_value = token;
+      res.target_display = token;
+    }
+  }
+  return res;
 }
 
 /* ============================================================
@@ -206,15 +233,31 @@ function bumpUserCounters(tid, field) {
 
 /* ============================================================
  *  WHISPER CRUD
+ * ============================================================
+ *  INLINE SPEED SPLIT — the old storeWhisper() did EVERYTHING
+ *  (id + save + global list + 5 counters + user registration) BEFORE
+ *  Api.answerInlineQuery, so every keystroke in the inline dropdown
+ *  waited on ~8 storage round-trips and the bot felt slow while users
+ *  typed. Now the inline command only calls createWhisperRecord()
+ *  (2 storage ops) before answering, and bumpInlineStats() right
+ *  AFTER the answer — the dropdown reacts fast, the bookkeeping
+ *  still happens.
  * ============================================================ */
 
-function storeWhisper(parsed, sender) {
+// FAST PATH — generate id + save the whisper record. That is the only
+// work that MUST happen before the inline answer (the reveal button
+// needs the record to exist). Returns the new whisper id.
+function createWhisperRecord(parsed, sender) {
   var id = generateId();
   var now = (typeof Date !== "undefined" && Date.now) ? Date.now() : 0;
   var whisper = {
     id: id,
     target_type: parsed.target_type,
     target_value: parsed.target_value,
+    // Original-case target ("@Maxim") for pretty cards/popup labels.
+    target_display: parsed.target_display ||
+      (parsed.target_type === "username" ? "@" + parsed.target_value
+                                         : parsed.target_value),
     message: parsed.message,
     sender_id: (sender && sender.telegramid) ? String(sender.telegramid) : "",
     sender_username: (sender && sender.username) ? String(sender.username) : "",
@@ -223,23 +266,32 @@ function storeWhisper(parsed, sender) {
     view_count: 0
   };
   Bot.setProperty("whisper_" + id, whisper, "json");
+  return id;
+}
 
-  // Bump the sender's per-user counters (used by /stats and /top_whispers).
-  // The per-user whisper LIST (user_whispers_<tid>) was removed along
-  // with the /mywhispers feature — we only keep the count now.
-  if (whisper.sender_id) {
-    bumpUserCounters(whisper.sender_id, "whisper");
-    bumpUserCounters(whisper.sender_id, "inline");
+// SLOW PATH — runs AFTER Api.answerInlineQuery. Registers the sender,
+// bumps per-user counters, updates the global list and all stat
+// counters. Nothing here blocks the inline dropdown.
+function bumpInlineStats(whisperId, sender) {
+  // Register + bump the sender's per-user counters (used by /stats and
+  // /top_whispers). The per-user whisper LIST was removed along with
+  // the /mywhispers feature — we only keep the count now.
+  if (sender && sender.telegramid) {
+    registerUser(sender);
+    bumpUserCounters(String(sender.telegramid), "whisper");
+    bumpUserCounters(String(sender.telegramid), "inline");
   }
 
   // Add to global list (newest first, capped at GLOBAL_LIST_CAP)
-  var globalList = Bot.getProperty("global_whispers");
-  if (!globalList) { globalList = []; }
-  globalList.unshift(id);
-  if (globalList.length > GLOBAL_LIST_CAP) {
-    globalList = globalList.slice(0, GLOBAL_LIST_CAP);
+  if (whisperId) {
+    var globalList = Bot.getProperty("global_whispers");
+    if (!globalList) { globalList = []; }
+    globalList.unshift(String(whisperId));
+    if (globalList.length > GLOBAL_LIST_CAP) {
+      globalList = globalList.slice(0, GLOBAL_LIST_CAP);
+    }
+    Bot.setProperty("global_whispers", globalList, "json");
   }
-  Bot.setProperty("global_whispers", globalList, "json");
 
   // Counters
   bumpCounter("whisper_count_total");
@@ -247,7 +299,14 @@ function storeWhisper(parsed, sender) {
   bumpTodayCounter("whispers_today_count", "whispers_today_date");
   // Note: whisper_count_revealed is bumped only on actual reveals
   // inside incrementViewCount() — never here on send.
+}
 
+// Legacy all-in-one (create + stats). The inline command now calls the
+// two functions separately around Api.answerInlineQuery — kept for any
+// external callers.
+function storeWhisper(parsed, sender) {
+  var id = createWhisperRecord(parsed, sender);
+  bumpInlineStats(id, sender);
   return id;
 }
 
@@ -427,6 +486,8 @@ publish({
   getUser: getUser,
   bumpUserCounters: bumpUserCounters,
   // whispers
+  createWhisperRecord: createWhisperRecord,
+  bumpInlineStats: bumpInlineStats,
   storeWhisper: storeWhisper,
   getWhisper: getWhisper,
   deleteWhisper: deleteWhisper,

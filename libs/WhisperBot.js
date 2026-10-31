@@ -34,10 +34,11 @@ var START_PHOTO_URL = "https://yukiapi.site/file/q1J9hr3d";
 // Small square icon URL used as the `thumb_url` on every inline result
 // card (the small picture shown next to each result in Telegram's inline
 // dropdown — replaces the default "W" letter avatar).
-// Points at the whisper-logo.jpg asset in this repo, served publicly via
-// GitHub raw. Replace with your own CDN URL if preferred.
-// If left empty, the inline results fall back to START_PHOTO_URL.
-var BOT_ICON_URL = "https://raw.githubusercontent.com/spicycodez/BB_WhisperBot/main/assets/whisper-logo.jpg";
+// Default: the WhisperBot logo shipped in this repo (assets/bot_logo.png),
+// served through GitHub's raw CDN. Replace with your own hosted square
+// image (PNG/JPG, ideally 512×512) or set to "" to fall back to
+// START_PHOTO_URL.
+var BOT_ICON_URL = "https://raw.githubusercontent.com/spicycodez/BB_WhisperBot/main/assets/bot_logo.png";
 
 /* ============================================================
  *  SMALL CAPS STYLING
@@ -63,18 +64,47 @@ function scChar(ch) {
   return ch;
 }
 
+// Telegram handles that must NEVER be small-capped — they stay
+// verbatim so they remain tappable mentions. Compared case-insensitively.
+var PRESERVED_HANDLES = {};
+PRESERVED_HANDLES[("@" + BOT_USERNAME).toLowerCase()] = true;
+PRESERVED_HANDLES["@botfather"] = true;
+PRESERVED_HANDLES["@userinfobot"] = true;
+
 // Convert one whitespace-delimited token to small caps.
-// /commands (e.g. "/start", "/mywhispers") and the literal bot
-// handle "@wisspbot" are preserved verbatim — Telegram needs them
-// intact so they remain tappable mentions/commands.
+// /commands (e.g. "/start", "/lang") and preserved handles
+// ("@wisspbot", "@BotFather") are kept verbatim — Telegram needs
+// them intact so they remain tappable mentions/commands.
+// /commands embedded in punctuation (e.g. "(/setinline)") are also
+// protected so nothing tappable ever gets restyled.
+var SEGMENT_RE = /\/[A-Za-z0-9_]+|@[A-Za-z0-9_]+/g;
+
+function scChunk(s) {
+  var o = "";
+  for (var i = 0; i < s.length; i++) { o += scChar(s.charAt(i)); }
+  return o;
+}
+
 function scToken(token) {
   if (!token) { return token; }
   if (token.charAt(0) === "/") { return token; }
-  if (token === "@" + BOT_USERNAME) { return token; }
+  if (PRESERVED_HANDLES[token.toLowerCase()]) { return token; }
+  // Keep /command and preserved @handle segments verbatim; small-cap
+  // everything between them. Non-preserved @mentions fall through to
+  // normal styling (they stay part of the surrounding chunk).
   var out = "";
-  for (var i = 0; i < token.length; i++) {
-    out += scChar(token.charAt(i));
+  var last = 0;
+  var re = new RegExp(SEGMENT_RE.source, "g");
+  var m;
+  while ((m = re.exec(token)) !== null) {
+    var seg = m[0];
+    var keepVerbatim = seg.charAt(0) === "/" || PRESERVED_HANDLES[seg.toLowerCase()];
+    if (!keepVerbatim) { continue; }
+    out += scChunk(token.slice(last, m.index));
+    out += seg;
+    last = m.index + seg.length;
   }
+  out += scChunk(token.slice(last));
   return out;
 }
 
@@ -228,9 +258,13 @@ function logReveal(whisper, viewer) {
   if (!isLoggingEnabled()) { return; }
   var viewerTag = (viewer && viewer.username) ? "@" + viewer.username
                                               : String(viewer.telegramid || "unknown");
-  var targetLabel = whisper.target_type === "username"
-    ? "@" + whisper.target_value
-    : "#" + whisper.target_value;
+  // Original-case target ("@Maxim") when available; lowercase fallback
+  // for whisper records stored before target_display existed.
+  var targetLabel = whisper.target_display
+    ? whisper.target_display
+    : (whisper.target_type === "username"
+        ? "@" + whisper.target_value
+        : "#" + whisper.target_value);
 
   var text =
     "👁 ʀᴇᴠᴇᴀʟ ʟᴏɢ\n" +

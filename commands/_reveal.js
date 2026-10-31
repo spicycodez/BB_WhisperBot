@@ -55,12 +55,17 @@ function doReveal() {
 
   if (!targetMatch && !senderMatch && !privileged) {
     // Wrong user — keep whisper alive so the real recipient can still reveal.
-    var targetLabel = whisper.target_type === "username"
-      ? "@" + whisper.target_value
-      : "#" + whisper.target_value;
+    // Original-case target ("@Maxim") when we have it, lowercase fallback
+    // for whispers stored before target_display existed.
+    var targetLabel = whisper.target_display
+      ? whisper.target_display
+      : (whisper.target_type === "username"
+          ? "@" + whisper.target_value
+          : "#" + whisper.target_value);
     Api.answerCallbackQuery({
       callback_query_id: request.id,
-      text: SC.toSmallCaps("Not for you! Only " + targetLabel + " can view."),
+      text: SC.toSmallCaps("Not for you! Only") + " " + targetLabel + " " +
+            SC.toSmallCaps("can view."),
       show_alert: false
     });
     return;

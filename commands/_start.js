@@ -1,12 +1,13 @@
 /*CMD
   command: /start
-  help: Photo menu with usage examples, inline buttons, registers user, notifies owner on first start
+  help: Photo menu with usage examples, inline buttons, registers user, notifies owner on first start. Deep links: ?start=help and ?start=lang
   need_reply: false
   aliases: start
 CMD*/
 
-var SC = Libs.WhisperBot;
-var W  = Libs.WhisperStore;
+var SC   = Libs.WhisperBot;
+var W    = Libs.WhisperStore;
+var I18N = Libs.WhisperI18n;
 
 // Register user + notify owner ONLY on a direct /start (typed), not when
 // the user taps a "Home" button to navigate back here. This avoids
@@ -31,37 +32,82 @@ if (isDirect) {
   }
 }
 
+// Language for this user's private UI (saved via /lang, default English).
+var tid = user ? String(user.telegramid) : "";
+var L   = I18N.get(tid);
+function bt(key) { return SC.toSmallCaps(I18N.t(L, key)); }
+
 // Acknowledge the callback (dismisses the spinner) if reached via button.
 SC.ackCallback();
 
+// ---------- DEEP LINKS ----------
+// t.me/wisspbot?start=help → /start help  → open the help screen.
+// t.me/wisspbot?start=lang → /start lang  → open the language picker.
+// These are used by the ❓ ʙᴏᴛ ʜᴇʟᴘ button on the inline invalid card
+// and by anyone sharing a direct link.
+var deepLink = "";
+if (isDirect && request.message && request.message.text) {
+  var parts = String(request.message.text).trim().split(/\s+/);
+  if (parts.length > 1 && /^\/start(@[A-Za-z0-9_]+)?$/i.test(parts[0])) {
+    deepLink = parts[1].toLowerCase();
+  }
+}
+
+if (deepLink === "lang") {
+  Api.sendMessage({
+    text: I18N.pickText(SC, L),
+    reply_markup: { inline_keyboard: I18N.langGrid(SC, L) }
+  });
+  return;
+}
+
+if (deepLink === "help") {
+  Api.sendMessage({
+    text: I18N.helpBody(SC, L),
+    reply_markup: { inline_keyboard: [
+      [
+        { text: "💌 " + bt("btn_create"), callback_data: "/create_whisper" },
+        { text: "🆔 " + bt("btn_id"),     callback_data: "/id" }
+      ],
+      [
+        { text: "🌐 " + bt("btn_lang"),   callback_data: "/lang" }
+      ],
+      [
+        { text: "🏠 " + bt("btn_home"),   callback_data: "/start" }
+      ]
+    ]}
+  });
+  return;
+}
+
+// ---------- MAIN MENU ----------
 // Menu body — kept under 1024 chars so it fits in a photo caption
 // when editOrSend uses editMessageCaption for in-place updates.
 var caption =
-  SC.toSmallCaps("Whisper Bot — Premium") + " 🤫✨\n" +
+  SC.toSmallCaps(I18N.t(L, "start_title")) + " 🤫✨\n" +
   SC.scDivider() + "\n" +
-  SC.toSmallCaps("Send anonymous inline whispers in any chat. Only the target can reveal.") + "\n" +
+  SC.toSmallCaps(I18N.t(L, "start_tag")) + "\n" +
   SC.scDivider() + "\n" +
-  SC.toSmallCaps("Inline only") + " ⚡\n" +
-  "@wisspbot " + SC.toSmallCaps("@username your secret message") + "\n" +
-  SC.toSmallCaps("Example") + ": @wisspbot @" + SC.toSmallCaps("john") + " " + SC.toSmallCaps("you are awesome!") + "\n" +
-  SC.toSmallCaps("Or by id") + ": @wisspbot 123456789 " + SC.toSmallCaps("hello") + "\n" +
+  "@wisspbot " + SC.toSmallCaps(I18N.t(L, "syntax_user_msg")) + "\n" +
+  SC.toSmallCaps(I18N.t(L, "start_example")) + ": @wisspbot @" +
+  SC.toSmallCaps("john") + " " + SC.toSmallCaps(I18N.t(L, "ex_whisper")) + "\n" +
+  "@wisspbot " + SC.toSmallCaps(I18N.t(L, "syntax_id_msg")) + "\n" +
   SC.scDivider() + "\n" +
-  SC.toSmallCaps("Only the target can tap") + " 👁 " + SC.toSmallCaps("reveal (popup)") + " — " + SC.toSmallCaps("no public message") + " 💎\n" +
-  SC.scDivider() + "\n" +
-  SC.toSmallCaps("Choose") + " 👇";
+  SC.toSmallCaps(I18N.t(L, "start_choose"));
 
-// 4 buttons in 3 rows. "My whispers" was removed per spec.
+// 6 buttons in 3 rows (language picker added). "My whispers" removed per spec.
 var keyboard = [
   [
-    { text: SC.toSmallCaps("Create whisper"),   callback_data: "/create_whisper" },
-    { text: SC.toSmallCaps("Try in group"),     switch_inline_query_current_chat: "@wisspbot " }
+    { text: "💌 " + bt("btn_create"), callback_data: "/create_whisper" },
+    { text: "💬 " + bt("btn_group"),  switch_inline_query_current_chat: "@wisspbot " }
   ],
   [
-    { text: SC.toSmallCaps("Help"),             callback_data: "/help" },
-    { text: SC.toSmallCaps("My id"),            callback_data: "/id" }
+    { text: "❓ " + bt("btn_help"),   callback_data: "/help" },
+    { text: "🆔 " + bt("btn_id"),     callback_data: "/id" }
   ],
   [
-    { text: SC.toSmallCaps("Share bot"),        switch_inline_query: "" }
+    { text: "🌐 " + bt("btn_lang"),   callback_data: "/lang" },
+    { text: "📤 " + bt("btn_share"),  switch_inline_query: "" }
   ]
 ];
 

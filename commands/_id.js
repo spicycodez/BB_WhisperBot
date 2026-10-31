@@ -1,33 +1,44 @@
 /*CMD
   command: /id
-  help: Show the user's Telegram id and @username — needed for id-based whispers
+  help: Show the user's Telegram id and @username — needed for id-based whispers (user's language)
   need_reply: false
   aliases: id, /myid
 CMD*/
 
-var SC = Libs.WhisperBot;
+var SC   = Libs.WhisperBot;
+var I18N = Libs.WhisperI18n;
 SC.ackCallback();
 
+var tid = user ? String(user.telegramid) : "";
+var L   = I18N.get(tid);
+function bt(key) { return SC.toSmallCaps(I18N.t(L, key)); }
+
 if (!user) {
-  SC.editOrSend(SC.toSmallCaps("Could not read your account info."), [[
-    { text: SC.toSmallCaps("Home"), callback_data: "/start" }
+  SC.editOrSend(SC.toSmallCaps(I18N.t(L, "id_error")), [[
+    { text: "🏠 " + bt("btn_home"), callback_data: "/start" }
   ]]);
   return;
 }
 
-var tid = String(user.telegramid || SC.toSmallCaps("unknown"));
-var uname = user.username ? "@" + user.username : SC.toSmallCaps("(no username set)");
+var uid   = String(user.telegramid || SC.toSmallCaps("unknown"));
+var uname = user.username ? "@" + user.username
+                          : SC.toSmallCaps(I18N.t(L, "no_username"));
 
 var body =
-  SC.toSmallCaps("Your Telegram identity") + " 👤\n" +
+  SC.toSmallCaps(I18N.t(L, "id_title")) + "\n" +
   SC.scDivider() + "\n" +
-  "• " + SC.toSmallCaps("Telegram id") + ": " + tid + "\n" +
-  "• " + SC.toSmallCaps("Username") + ": " + uname + "\n" +
+  "• " + SC.toSmallCaps(I18N.t(L, "lbl_tgid")) + ": " + uid + "\n" +
+  "• " + SC.toSmallCaps(I18N.t(L, "lbl_username")) + ": " + uname + "\n" +
   SC.scDivider() + "\n" +
-  SC.toSmallCaps("Send this id to anyone who wants to whisper to you by numeric id") + ":\n" +
-  "@wisspbot " + tid + " " + SC.toSmallCaps("your message");
+  SC.toSmallCaps(I18N.t(L, "id_hint")) + "\n" +
+  "@wisspbot " + uid + " " + SC.toSmallCaps(I18N.t(L, "id_msg_hint"));
 
-SC.editOrSend(body, [[
-  { text: SC.toSmallCaps("Home"), callback_data: "/start" },
-  { text: SC.toSmallCaps("Help"), callback_data: "/help" }
-]]);
+SC.editOrSend(body, [
+  [
+    { text: "🏠 " + bt("btn_home"), callback_data: "/start" },
+    { text: "❓ " + bt("btn_help"), callback_data: "/help" }
+  ],
+  [
+    { text: "🌐 " + bt("btn_lang"), callback_data: "/lang" }
+  ]
+]);

@@ -181,3 +181,22 @@ Recommended: keep GitHub as the source of truth.
 | `users_total` not incrementing | New-user registration only fires on `/start` | Have a new user send `/start` once |
 | Today counters stuck at 0 | Date rollover logic depends on `todayStr()` which uses UTC | Counters reset at 00:00 UTC |
 | Photo menu doesn't appear | `START_PHOTO_URL` is empty or unreachable | Set a valid image URL, or leave empty for text menu |
+
+---
+
+## New in this version
+
+| Feature | Where | Notes |
+|---|---|---|
+| `/lang` — 12 languages | `libs/WhisperI18n.js`, `commands/_lang.js`, `commands/_lang_set.js` | Choice saved to `user_<id>.lang`; drives `/start`, `/help`, `/id`, `/create_whisper`, catch-all. Languages: English, हिन्दी, বাংলা, தமிழ், اردو, Español, Português, العربية, Русский, Indonesia, Français, Deutsch |
+| Deep links | `commands/_start.js` | `t.me/wisspbot?start=help` → help screen, `t.me/wisspbot?start=lang` → language picker |
+| ❌ Invalid-whisper card | `commands/_inlineQuery.js` | Typing just `@wisspbot` (or a bad target) shows "ɪɴᴠᴀʟɪᴅ ᴡʜɪsᴘᴇʀ! ᴘʟᴇᴀsᴇ ᴄʀᴇᴀᴛᴇ ᴀɴᴏᴛʜᴇʀ ᴏɴᴇ" with the syntax (`@wisspbot @username your message`) and a **❓ ʙᴏᴛ ʜᴇʟᴘ** button that opens `?start=help` |
+| ✍️ Composing preview | `commands/_inlineQuery.js` | Target typed but no message yet → live "Whisper for @Maxim" card instead of an error |
+| Instant inline answers | `libs/WhisperStore.js` split | `createWhisperRecord()` runs **before** `answerInlineQuery` (2 storage ops); registration + counters run **after** in `bumpInlineStats()`. Telegram re-queries on every keystroke — less pre-answer work = no "slow bot" feeling |
+| Original-case names | `target_display` field | `@Maxim` stays `@Maxim` on cards, dropdown titles, toasts and reveal logs; matching stays case-insensitive |
+| Bot logo | `assets/bot_logo.png` + `BOT_ICON_URL` | Attached as `thumb_url` on every inline result. Default URL: `https://raw.githubusercontent.com/spicycodez/BB_WhisperBot/main/assets/bot_logo.png` |
+
+### After importing this version
+
+1. Re-run **Import from Git** so the 2 new commands (`/lang`, `/lang_set`) and 3 libraries install.
+2. Nothing else to configure — `BOT_ICON_URL` already points at the repo logo.

@@ -2,11 +2,45 @@
 
 > Send anonymous inline whispers in **any** Telegram chat. The recipient sees only a card with a **👁 ʀᴇᴠᴇᴀʟ ᴡʜɪsᴘᴇʀ** button. When they tap it, the message pops up privately on their device — **nothing is posted in the chat**. Perfect for groups, games and surprise compliments. ✨
 
-Every line of text the bot sends is rendered in **small caps** (Unicode small caps, e.g. `ᴡʜɪsᴘᴇʀ ʙᴏᴛ`). `/commands` and the literal `@wisspbot` handle are preserved verbatim so they remain tappable Telegram links.
+Every line of text the bot sends is rendered in **small caps** (Unicode small caps, e.g. `ᴡʜɪsᴘᴇʀ ʙᴏᴛ`). `/commands` and preserved handles (`@wisspbot`, `@BotFather`) are kept verbatim so they remain tappable Telegram links.
 
 ---
 
 ## ✨ Features
+
+### Multilingual UI — /lang (12 languages)
+
+`/lang` opens a 2-column picker (English, हिन्दी, বাংলা, தமிழ், اردو, Español, Português, العربية, Русский, Indonesia, Français, Deutsch). The choice is **saved against the user's account** (`user_<id>.lang`) and drives `/start`, `/help`, `/id`, `/create_whisper`, the catch-all and the language screens themselves — the confirmation even arrives in the newly picked language. Inline whisper cards and reveal popups stay English on purpose: they are shown in group chats to mixed audiences.
+
+Deep links: `t.me/wisspbot?start=help` opens the help screen, `t.me/wisspbot?start=lang` opens the language picker directly.
+
+### Instant inline dropdown (no "slow bot" feel)
+
+Telegram re-fires the inline query on **every keystroke**. The handler is built for that:
+
+- Before answering it only does the minimum (parse + save the whisper record — 2 storage ops)
+- Registration, counters and the global list run **after** `Api.answerInlineQuery`
+- `cache_time: 0` + `is_personal: true` keep every user's results fresh
+- A target with no message yet shows a **✍️ composing card** ("Whisper for @Maxim") instead of an error, so typing feels live
+
+### Smart inline cards
+
+| Input | Card |
+|---|---|
+| `@wisspbot` (nothing else) | **❌ ɪɴᴠᴀʟɪᴅ ᴡʜɪsᴘᴇʀ! ᴘʟᴇᴀsᴇ ᴄʀᴇᴀᴛᴇ ᴀɴᴏᴛʜᴇʀ ᴏɴᴇ** + full syntax `@wisspbot @username your message` (handle on the left, what to type on the right — exactly where the user typed the handle) |
+| invalid target / message too long | same invalid card, the reason in the dropdown description |
+| valid target, no message | ✍️ composing preview with the target's original case |
+| valid whisper | 💌 whisper card + 👁 ʀᴇᴠᴇᴀʟ ᴡʜɪsᴘᴇʀ button |
+
+Every invalid/composing card carries a **❓ ʙᴏᴛ ʜᴇʟᴘ** button (deep link to `?start=help`) and a **🆕 sᴛᴀʀᴛ ᴏᴠᴇʀ** button that re-opens inline mode in the same chat.
+
+### Original-case names
+
+Targets and senders keep **the exact case the sender typed**: whisper to `@Maxim` and the card, the dropdown title and the reveal popups all show `@Maxim` — never `@ᴍᴀxɪᴍ`. Matching on reveal stays case-insensitive (`@MAXIM`, `@maxim`, `@Maxim` all match).
+
+### Bot logo in the inline dropdown
+
+`assets/bot_logo.png` (speech-bubble + padlock mark) is served from the repo's raw URL and attached as `thumb_url` on **every** inline result — it replaces Telegram's default letter avatar in the dropdown.
 
 ### Zero-spam menu navigation
 
@@ -26,8 +60,8 @@ This keeps the chat clean — no message spam from menu navigation.
 | **Inline-only** | Users type `@wisspbot @username message` in *any* chat — no `/command` needed in the chat |
 | **Two target formats** | `@username` (5–32 chars) **or** numeric Telegram ID (5–15 digits) |
 | **8-char whisper id** | Collision-checked random id like `ab12cd34` |
-| **Validation** | Target must be valid @username or 5–15 digit id; message 1–800 chars; errors returned as inline error cards |
-| **Card never leaks message** | The posted card names the recipient only. Message preview (~30 chars) appears in Telegram's inline result list, not on the card |
+| **Validation** | Target must be valid @username or 5–15 digit id; message 1–800 chars; invalid input returns the ❌ invalid-whisper card with reason + syntax + help button |
+| **Card never leaks message** | The posted card names the recipient only. Message preview (~40 chars) appears in Telegram's inline result list, not on the card |
 | **Reveal popup** | Only target/sender/owner/sudo can reveal — `Api.answerCallbackQuery({ show_alert: true })` popup, never a chat message |
 | **One-time view counter** | Each reveal bumps `view_count` and `whisper_count_revealed` |
 | **Popup truncation** | Telegram popups cap at ~195 chars; long messages are truncated with `…` |
@@ -37,8 +71,8 @@ This keeps the chat clean — no message spam from menu navigation.
 
 | Store | Cap | Purpose |
 |---|---|---|
-| `whisper_<id>` | — | One whisper object: id, target, message, sender, date, view_count |
-| `user_<tid>` | — | One user object: telegramid, name, username, join_date, whisper_count, inline_count |
+| `whisper_<id>` | — | One whisper object: id, target, target_display (original case), message, sender, date, view_count |
+| `user_<tid>` | — | One user object: telegramid, name, username, join_date, whisper_count, inline_count, **lang** (from /lang) |
 | `global_whispers` | 2000 newest | Global whisper index |
 | `users_index` | — | All registered telegramids (registration order) |
 
@@ -46,10 +80,11 @@ This keeps the chat clean — no message spam from menu navigation.
 
 | Command | What it does |
 |---|---|
-| `/start` | Photo menu with usage examples, 4 buttons (create / try in group / help / my id / share bot), registers user, notifies owner on first start. All menus edit-in-place (zero spam) |
+| `/start` | Photo menu with usage examples, 6 buttons (create / try in group / help / my id / **language** / share bot), registers user, notifies owner on first start. Deep links: `?start=help`, `?start=lang`. All menus edit-in-place (zero spam) |
 | `/create_whisper` (alias `/whisper`) | Instructions + button to open inline mode in the current chat |
-| `/create_whisper` (alias `/whisper`) | Instructions + button to open inline mode in the current chat |
-| `/help` | What a whisper is, exact inline syntax, how revealing works, 3 practical tips |
+| `/lang` | Pick the language the bot speaks to you in (12 languages) — choice saved to your account |
+| `/lang_set <code>` | Button target that saves the language and confirms in that language |
+| `/help` | What a whisper is, exact inline syntax, how revealing works, 3 practical tips — in the user's language |
 | `/cancel` | Clears any half-finished draft (leftover — whispers are inline only, nothing to clear) |
 | `/reveal`, `/whisper_target`, `/whisper_text` | Informational stubs that redirect to inline mode (`/reveal` is also the callback target for the 👁 button) |
 | `/id` | Shows your Telegram ID + @username — needed for ID-based whispers |
@@ -70,8 +105,9 @@ Anyone else gets `⛔ ᴀᴄᴄᴇss ᴅᴇɴɪᴇᴅ`.
 
 ### Shared helpers (in `libs/`)
 
-- **`libs/WhisperBot.js`** — `OWNER_ID`, `SUDO_USERS`, `LOGGER_CHAT_ID`, `BOT_USERNAME`, `START_PHOTO_URL` constants. Exports `toSmallCaps`, `scDivider`, `escapeHtml`, `truncate`, `isOwner`, `isSudo`, `isOwnerOrSudo`, `isLoggingEnabled`, `editOrSend` (smart edit helper), `logReveal`, `ackCallback`.
-- **`libs/WhisperStore.js`** — `parseQuery`, `generateId`, `registerUser`, `getUser`, `storeWhisper`, `getWhisper`, `deleteWhisper`, `incrementViewCount`, `listGlobalWhispers`, `bumpCounter`, `getCounter`, `getTodayCount`, `todayStr`, `topWhisperSenders`, `topInlineSenders`, `totalUsers`, `listUsersPage`, `exportAllUsers`.
+- **`libs/WhisperBot.js`** — `OWNER_ID`, `SUDO_USERS`, `LOGGER_CHAT_ID`, `BOT_USERNAME`, `START_PHOTO_URL`, `BOT_ICON_URL` constants. Exports `toSmallCaps`, `scDivider`, `escapeHtml`, `truncate`, `isOwner`, `isSudo`, `isOwnerOrSudo`, `isLoggingEnabled`, `editOrSend` (smart edit helper), `logReveal`, `ackCallback`.
+- **`libs/WhisperStore.js`** — `parseQuery` (returns `target_display` with original case), `generateId`, `registerUser`, `getUser`, `createWhisperRecord` (fast pre-answer save), `bumpInlineStats` (post-answer bookkeeping), `storeWhisper`, `getWhisper`, `deleteWhisper`, `incrementViewCount`, `listGlobalWhispers`, `bumpCounter`, `getCounter`, `getTodayCount`, `todayStr`, `topWhisperSenders`, `topInlineSenders`, `totalUsers`, `listUsersPage`, `exportAllUsers`.
+- **`libs/WhisperI18n.js`** — 12-language string table, `get`/`set` (language saved to `user_<id>.lang`), and ready-made screens: `pickText`, `langGrid`, `setText`, `helpBody`.
 
 Every command calls `Libs.WhisperBot.toSmallCaps(...)` on every string it sends, so the bot's voice is consistent end-to-end.
 
@@ -138,10 +174,14 @@ git push origin main
 ```
 whisper-bot-bjs/
 ├── bot.json                          # bb_sync_version 1.0
+├── assets/
+│   └── bot_logo.png                  # logo used as inline thumb_url
 ├── commands/
-│   ├── _start.js                     # /start        — photo menu, registers user
+│   ├── _start.js                     # /start        — photo menu, deep links, registers user
 │   ├── _create_whisper.js            # /create_whisper + /whisper alias
-│   ├── _help.js                      # /help         — syntax + 3 tips
+│   ├── _lang.js                      # /lang         — language picker (12 languages)
+│   ├── _lang_set.js                  # /lang_set     — saves language to account
+│   ├── _help.js                      # /help         — syntax + 3 tips (user's language)
 │   ├── _id.js                        # /id           — your Telegram id
 │   ├── _cancel.js                    # /cancel       — leftover, harmless
 │   ├── _reveal.js                    # /reveal       — callback + stub (dual)
@@ -157,7 +197,8 @@ whisper-bot-bjs/
 │   └── _catchall.js                  # *             — catch-all
 ├── libs/
 │   ├── WhisperBot.js                 # settings + small caps + auth + smart edit
-│   └── WhisperStore.js               # storage + lists + leaderboards
+│   ├── WhisperStore.js               # storage + lists + leaderboards
+│   └── WhisperI18n.js                # 12-language UI translations
 ├── docs/
 │   ├── SETUP.md                      # detailed setup walkthrough
 │   ├── BJS_API_NOTES.md              # BJS API reference used while building
@@ -174,9 +215,9 @@ whisper-bot-bjs/
 Every string the bot sends is passed through `Libs.WhisperBot.toSmallCaps(text)`:
 
 1. **Tokenize** by whitespace.
-2. **Preserve** tokens starting with `/` (commands like `/start`) and the literal `@wisspbot` handle — these need to stay intact so Telegram renders them as tappable links.
+2. **Preserve** tokens starting with `/` (commands like `/start`), preserved handles (`@wisspbot`, `@BotFather`, `@userinfobot`) and `/commands` embedded in punctuation (e.g. `(/setinline)`) — these need to stay intact so Telegram renders them as tappable links.
 3. **Convert** every other token: uppercase the letters first, then map `A-Z` to their Unicode small-caps equivalents (`A→ᴀ`, `B→ʙ`, …, `Z→ᴢ`).
-4. **Digits, emojis and symbols** pass through unchanged.
+4. **Digits, emojis, non-Latin scripts (Hindi, Arabic, Russian, …) and symbols** pass through unchanged.
 
 Result: `Whisper Bot — Premium` → `ᴡʜɪsᴘᴇʀ ʙᴏᴛ — ᴘʀᴇᴍɪᴜᴍ`, but `@wisspbot` and `/start` stay intact.
 
@@ -206,6 +247,19 @@ var SUDO_USERS = ["1234567890", "9876543210"];
 ### Add a banner photo for `/start`
 
 Set `START_PHOTO_URL = "https://your.cdn/banner.jpg"` in `libs/WhisperBot.js`. The `/start` command will then send a photo with the menu as its caption. Leave empty for a text-only menu.
+
+### Change the inline logo
+
+`BOT_ICON_URL` in `libs/WhisperBot.js` defaults to the repo's own logo:
+`https://raw.githubusercontent.com/spicycodez/BB_WhisperBot/main/assets/bot_logo.png`.
+Replace it with any public square image (PNG/JPG, 512×512 recommended), or set it to `""` to fall back to the start banner.
+
+### Add a language
+
+1. Open `libs/WhisperI18n.js`
+2. Add the code to `LANG_NAMES` (flag + native name) and `ORDER` (picker grid)
+3. Copy the `en` block, translate every key, add it to `STR` — the picker, saving and fallback all pick it up automatically
+4. Any missing key automatically falls back to English
 
 ---
 
