@@ -79,6 +79,7 @@ function parseQuery(query, sc) {
 
   var target_type = null;
   var target_value = null;
+  var original_value = null;
 
   if (token.charAt(0) === "@") {
     var username = token.slice(1);
@@ -98,11 +99,15 @@ function parseQuery(query, sc) {
     // Lowercase for case-insensitive matching on reveal — so a whisper
     // sent to @USERNAME, @username or @UserName all match the same user.
     target_value = username.toLowerCase();
+    // Preserve the original case as the sender typed it, for display on
+    // the whisper card (e.g. sender types @Maxim → card shows @Maxim).
+    original_value = username;
   } else if (/^[0-9]+$/.test(token) &&
              token.length >= ID_DIGITS_MIN &&
              token.length <= ID_DIGITS_MAX) {
     target_type = "id";
     target_value = token;
+    original_value = token;
   } else {
     return {
       ok: false,
@@ -117,6 +122,7 @@ function parseQuery(query, sc) {
     ok: true,
     target_type: target_type,
     target_value: target_value,
+    original_value: original_value || target_value,
     message: message
   };
 }

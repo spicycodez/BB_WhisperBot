@@ -34,8 +34,10 @@ var START_PHOTO_URL = "https://yukiapi.site/file/q1J9hr3d";
 // Small square icon URL used as the `thumb_url` on every inline result
 // card (the small picture shown next to each result in Telegram's inline
 // dropdown — replaces the default "W" letter avatar).
+// Points at the whisper-logo.jpg asset in this repo, served publicly via
+// GitHub raw. Replace with your own CDN URL if preferred.
 // If left empty, the inline results fall back to START_PHOTO_URL.
-var BOT_ICON_URL = "";
+var BOT_ICON_URL = "https://raw.githubusercontent.com/spicycodez/BB_WhisperBot/main/assets/whisper-logo.jpg";
 
 /* ============================================================
  *  SMALL CAPS STYLING

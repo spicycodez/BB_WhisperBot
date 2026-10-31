@@ -89,18 +89,32 @@ if (!query || !query.trim()) {
 } else {
   // Valid → store whisper, return card
   var id = W.storeWhisper(parsed, user);
+
+  // Display label preserves the case the SENDER typed (e.g. "@Maxim"
+  // shows as "@Maxim", not "@ᴍᴀxɪᴍ"). Case-insensitive matching for
+  // reveal still uses the lowercased target_value under the hood.
   var label = parsed.target_type === "username"
-    ? "@" + parsed.target_value
+    ? "@" + parsed.original_value
     : "#" + parsed.target_value;
 
-  // Card body (sent into the chat when result is picked) — names the
-  // recipient only, never the message text.
+  // Card body (sent into the chat when result is picked).
+  // Format per spec:
+  //   🤫 sᴇᴄʀᴇᴛ ᴡʜɪsᴘᴇʀ ғᴏʀ @Maxim ✨
+  //   ᴏɴʟʏ @Maxim ᴄᴀɴ ʀᴇᴠᴇᴀʟ ɪᴛ — ᴛᴀᴘ ʙᴜᴛᴛᴏɴ ʙᴇʟᴏᴡ.
+  //   ━━━━━━━━━━━━━━━━━━━━
+  //   ᴛᴀᴘ 👁 ʀᴇᴠᴇᴀʟ ᴡʜɪsᴘᴇʀ ᴛᴏ ᴠɪᴇᴡ (ᴘʀɪᴠᴀᴛᴇ ᴘᴏᴘᴜᴘ) 🔒
+  // Never includes the message text — only the card + Reveal button.
   var card =
-    SC.toSmallCaps("Whisper for") + " " + SC.toSmallCaps(label) + "\n" +
+    "🤫 " + SC.toSmallCaps("secret whisper for") + " " + label + " ✨\n" +
+    SC.toSmallCaps("Only") + " " + label + " " +
+      SC.toSmallCaps("can reveal it — tap button below.") + "\n" +
     SC.scDivider() + "\n" +
-    SC.toSmallCaps("Tap reveal to see — only the target can view") + " 🔒\n" +
-    SC.scDivider() + "\n" +
-    SC.toSmallCaps("Sent via") + " @wisspbot";
+    SC.toSmallCaps("Tap") + " 👁 " +
+      SC.toSmallCaps("reveal whisper") + " " +
+      SC.toSmallCaps("to view") + " (" + SC.toSmallCaps("private popup") + ") 🔒";
+
+  // Title in the dropdown uses the same wording.
+  var resultTitle = "🤫 " + SC.toSmallCaps("secret whisper for") + " " + label;
 
   // Description shows in Telegram's inline result list (the dropdown
   // above the input field) — roughly 30 chars of the message so the
@@ -111,7 +125,7 @@ if (!query || !query.trim()) {
   results.push(makeResult({
     type: "article",
     id: id,
-    title: SC.toSmallCaps("Whisper for") + " " + SC.toSmallCaps(label),
+    title: resultTitle,
     description: preview,
     input_message_content: {
       message_text: card
